@@ -113,6 +113,10 @@ public class Test {
     /**
      * 测试群消息是否正常发送
      * @param event
+     * 
+     *         消息发送方法
+     *         MessageRequest messageRequest = new MessageRequest(msgHead.getFromUin(), "你好", atUinLists);
+     *         client.sendMessage(messageRequest);
      */
     @EventListener
     public void send(GroupMessageEvent event) {
@@ -137,6 +141,7 @@ public class Test {
     public void TestSend(GroupMessageEvent event) {
         if (!MessageEquals(event, "/img")) return;
         MsgHeadVO msgHead = event.getMsgBodyVO().getCurrentPacket().getEventData().getMsgHead();
+        // 令牌桶限流，防止调用太频繁导致低配置服务器宕机
         if (!rateLimiter.tryAcquire()) {
             MessageRequest messageRequest = new MessageRequest(msgHead.getFromUin(), "调用太频繁，触发限流规则", null);
             client.sendMessage(messageRequest);
@@ -144,6 +149,7 @@ public class Test {
         }
 
         Long fromUin = event.getMsgBodyVO().getCurrentPacket().getEventData().getMsgHead().getFromUin();
+        //图片发送前需要对其进行上传，获取到fileId，fileMd5，fileSize
         UpLoadFile upLoadFile = new UpLoadFile(new UpLoadFile.CgiRequest(2, compressAndEncodeToBase64Thumbnails(api.getPc(), 1.0f)));
         UploadResponse uploadResponse = client.UpLoadFile(upLoadFile);
         log.info("上传图片: {}", new Gson().toJson(uploadResponse));
@@ -152,14 +158,52 @@ public class Test {
         if (fileId == null) return;
         String fileMd5 = responseData.getFileMd5();
         Integer fileSize = responseData.getFileSize();
-
+        //发送图片传入fileId，fileMd5，fileSize，构造图片消息链进行发送
         List<MessageImageRequest.ImageInfo> imageInfos = new ArrayList<>();
         imageInfos.add(new MessageImageRequest.ImageInfo(fileId, fileMd5, fileSize));
         MessageImageRequest messageImageRequest = new MessageImageRequest(fromUin, imageInfos);
         log.info("发送结果---> %s".formatted(client.sendMessage(messageImageRequest)));
     }
+
+
+    /**
+     * 快速抢红包功能，目前官方的只能支持拼手气红包和口令红包，就做了这个功能，后续还会继续跟进
+     * @param event
+     */
+
+    @SneakyThrows
+    @EventListener
+    public void RedBagQuick(GroupMessageEvent event) {
+        MsgHeadVO msgHead = event.getMsgBodyVO().getCurrentPacket().getEventData().getMsgHead();
+        RedBagRequest.CgiRequest redBagVO = new RedBagRequest.CgiRequest();
+        RedBagRequest redBagRequest = new RedBagRequest();
+        RedBagVO redBag = event.getMsgBodyVO().getCurrentPacket().getEventData().getMsgBody().getRedBag();
+        if (redBag == null) return;
+        redBagVO.setWishing(redBag.getWishing());
+        redBagVO.setDes(redBag.getDes());
+        redBagVO.setRedType(redBag.getRedType());
+        redBagVO.setListid(redBag.getListid());
+        redBagVO.setAuthkey(redBag.getAuthkey());
+        redBagVO.setChannel(redBag.getChannel());
+        redBagVO.setStingIndex(redBag.getStingIndex());
+        redBagVO.setTransferMsg(redBag.getTransferMsg());
+        redBagVO.setToken_17_2(redBag.getToken_17_2());
+        redBagVO.setToken_17_3(redBag.getToken_17_3());
+        redBagVO.setFromUin(redBag.getFromUin());
+        redBagVO.setFromType(redBag.getFromType());
+        redBagRequest.setCgiRequest(redBagVO);
+        double money = new Gson().fromJson(client.sendMessage(redBagRequest), JsonObject.class).getAsJsonObject("ResponseData").get("GetMoney").getAsDouble();
+        if (redBag.getRedType().intValue() == 12) {
+            client.sendMessage(new MessageRequest(msgHead.getFromUin(), redBag.getWishing(), null));
+            Thread.sleep(10000);
+            client.sendMessage(new MessageRequest(msgHead.getFromUin(), RandomThanks(), null));
+        } else {
+            Thread.sleep(10000);
+            client.sendMessage(new MessageRequest(msgHead.getFromUin(), RandomThanks(), null));
+        }
+        log.info("领取红包金额: {} 元", money / 100.0);
+    }
 }
-
 ```
-
+***
 # 感谢
