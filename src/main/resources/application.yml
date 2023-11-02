@@ -1,0 +1,22 @@
+# websocket链接地址
+base:
+  ws: ws://127.0.0.1:9000/ws
+
+
+forest:
+  backend: okhttp3
+  async-mode: platform
+  connect-timeout: 300000
+  read-timeout: 300000
+  timeout: 300000
+  variables:
+    #  发送消息所需要的地址
+    baseApi: 'http://127.0.0.1:9000'
+    userAgent: 'Apifox/1.0.0 (https://apifox.com)'
+    #    Bot账号
+    #    qq: 750573204
+    qq: 257207868
+    #
+    apiKey:
+  log-enabled: false
+  log-response-status: true
